@@ -1,0 +1,49 @@
+{
+  "name": "casting-windows",
+  "version": "1.0.0",
+  "description": "DLNA 投屏接收器（Windows）—— 接收安卓 App 内置的投屏功能",
+  "main": "src/main/main.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/smoke.js",
+    "build": "electron-builder --win && node scripts/make-portable.js",
+    "build:zip": "node scripts/make-portable.js"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.11.2",
+    "hls.js": "^1.7.3"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.casting.dlna.windows",
+    "productName": "CastReceiver",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "投屏接收器"
+    }
+  },
+  "allowScripts": {
+    "electron@45.0.0": true
+  }
+}
