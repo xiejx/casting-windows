@@ -30,7 +30,15 @@ jobs:
         run: npm ci
 
       - name: 构建安装包与便携版
-        run: npm run build
+        shell: pwsh
+        run: |
+          npm run build 2>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) {
+            $tail = (Get-Content build.log -Tail 30) -join "`n"
+            $msg = $tail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error file=build.log::$msg"
+            exit 1
+          }
 
       - name: 生成 SHA256 校验文件
         shell: pwsh
