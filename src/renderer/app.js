@@ -107,6 +107,15 @@ function bindEvents() {
   });
 
   ui.playPauseBtn.addEventListener('click', togglePlay);
+  window.addEventListener('keydown', (event) => {
+    if (event.key !== ' ' && event.code !== 'Space') return;
+    if (event.repeat) return;
+    if (!ui.settingsModal.hidden) return;
+    const tag = event.target && event.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    event.preventDefault();
+    togglePlay();
+  });
   ui.stopBtn.addEventListener('click', () => {
     stopPlayback();
     window.cast.updatePlayer('state', { state: 'STOPPED' });
