@@ -10,8 +10,9 @@
 
 - **即装即用**：启动后自动以「`Windows 投屏 (电脑名)`」为名加入局域网，手机 App 的投屏列表里可直接看到。
 - **完整 DLNA 协议栈**：SSDP 发现、设备描述、`AVTransport` / `RenderingControl` / `ConnectionManager` 服务、GENA 事件订阅，手机端的播放、暂停、停止、拖动进度、音量、静音均可双向同步。
-- **内置播放器**：窗口内直接播放，支持 MP4 / WebM / TS / MP3 / AAC / FLAC / WAV / JPEG / PNG 等格式。
+- **内置播放器**：窗口内直接播放，支持 MP4 / WebM / TS / FLV / MP3 / AAC / FLAC / WAV / JPEG / PNG 等格式。
 - **HLS 支持**：识别 `.m3u8` 流并通过 hls.js 播放，自动重写播放列表与分片地址。
+- **FLV 直播流支持**：B 站等 App 直播投屏下发的 FLV 流无法被 Chromium 原生播放，改用 mpegts.js 转封装播放；同时为 B 站 CDN 自动补齐防盗链所需的 `Referer`。
 - **媒体代理**：远端视频先经本机代理转发，规避 App 服务器的跨域限制、自签证书与防盗链问题，支持 HTTP Range 断点续传。
 - **倍速播放**：0.5× / 0.75× / 1× / 1.25× / 1.5× / 2×，换片后保持所选倍速。
 - **清晰度切换**：

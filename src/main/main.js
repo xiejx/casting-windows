@@ -234,11 +234,14 @@ function createWindow() {
     win = null;
   });
 
-  win.webContents.on('console-message', (event, details) => {
-    if (!details || details.level < 2) return;
+  win.webContents.on('console-message', (details) => {
+    // Electron 45 起改为事件对象参数，level 为 info / warning / error / debug
+    if (!details) return;
+    const level = details.level;
+    if (level !== 'warning' && level !== 'error') return;
     const location = details.sourceId ? ` (${details.sourceId}:${details.lineNumber})` : '';
     const text = `界面异常：${details.message}${location}`;
-    if (details.level >= 3) logger.error(text);
+    if (level === 'error') logger.error(text);
     else logger.warn(text);
   });
 

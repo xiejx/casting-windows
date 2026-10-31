@@ -8,6 +8,26 @@ const BROWSER_UA =
 const MAX_REDIRECTS = 5;
 const MAX_PLAYLIST_BYTES = 4 * 1024 * 1024;
 
+// B 站直播 CDN（live-bvc / bilivideo 等）会校验防盗链，缺少 Referer 时会返回 403
+function siteHeaders(targetUrl) {
+  const headers = {
+    'User-Agent': BROWSER_UA,
+    Accept: '*/*',
+    'Accept-Encoding': 'identity',
+  };
+  let host = '';
+  try {
+    host = new URL(targetUrl).hostname.toLowerCase();
+  } catch {
+    return headers;
+  }
+  if (host.includes('bilibili.com') || host.includes('bilivideo.com') || host.includes('hdslb.com')) {
+    headers.Referer = 'https://live.bilibili.com/';
+    headers.Origin = 'https://live.bilibili.com';
+  }
+  return headers;
+}
+
 function upstreamRequest(targetUrl, options, redirectsLeft) {
   const { method = 'GET', headers = {} } = options || {};
   return new Promise((resolve, reject) => {
@@ -64,6 +84,22 @@ function upstreamRequest(targetUrl, options, redirectsLeft) {
     request.on('error', reject);
     request.end();
   });
+}
+
+const recentLogs = new Map();
+
+// 同一来源短时间内重复失败会刷屏，这里做 60 秒去重
+function logOnce(logger, level, key, message) {
+  const now = Date.now();
+  const last = recentLogs.get(key);
+  if (last && now - last < 60000) return;
+  recentLogs.set(key, now);
+  if (recentLogs.size > 100) {
+    for (const [name, time] of recentLogs) {
+      if (now - time > 60000) recentLogs.delete(name);
+    }
+  }
+  logger[level](message);
 }
 
 function setCors(res) {
@@ -162,11 +198,7 @@ async function handleProxy(req, res, urlObj, { port, logger }) {
     return;
   }
 
-  const headers = {
-    'User-Agent': BROWSER_UA,
-    Accept: '*/*',
-    'Accept-Encoding': 'identity',
-  };
+  const headers = siteHeaders(targetUrl.toString());
   if (req.headers.range) headers.Range = req.headers.range;
   if (req.headers['if-range']) headers['If-Range'] = req.headers['if-range'];
 
@@ -190,6 +222,18 @@ async function handleProxy(req, res, urlObj, { port, logger }) {
     finalPath = '';
   }
   const isPlaylist = forcedHls || /mpegurl/.test(upstreamType) || /\.m3u8(\?|#|$)/i.test(finalPath);
+
+  if ((response.statusCode || 0) >= 400) {
+    logOnce(
+      logger,
+      'warn',
+      `status:${targetUrl.host}`,
+      `媒体源返回 ${response.statusCode}：${targetUrl.host}${finalPath}（${upstreamType || '无类型'}）`
+    );
+  }
+  if (isPlaylist) {
+    logOnce(logger, 'info', `playlist:${targetUrl.host}`, `媒体代理：${targetUrl.host} 返回播放列表`);
+  }
 
   if (isPlaylist && req.method !== 'HEAD') {
     try {
@@ -247,4 +291,5 @@ async function handleProxy(req, res, urlObj, { port, logger }) {
 module.exports = {
   handleProxy,
   rewritePlaylist,
+  siteHeaders,
 };

@@ -5,6 +5,7 @@ const http = require('http');
 const { DlnaDevice } = require('../src/core/device');
 const { DlnaHttpServer } = require('../src/core/http-server');
 const { escapeXml } = require('../src/core/util');
+const { siteHeaders } = require('../src/core/proxy');
 
 const logger = { info() {}, warn() {}, error: (m) => console.error(m) };
 
@@ -189,7 +190,14 @@ async function main() {
     ).text();
     assert.strictEqual(tag(stopped, 'CurrentTransportState'), 'STOPPED');
 
-    // 9. 代理：Range 透传 + HLS 播放列表重写
+    // 9. 代理：B 站直播 CDN 防盗链所需请求头
+    const biliHeaders = siteHeaders('https://d1--cn-gotcha204.bilivideo.com/live-bvc/1/live_1.flv');
+    assert.strictEqual(biliHeaders.Referer, 'https://live.bilibili.com/', 'B 站地址应带 Referer');
+    assert.strictEqual(biliHeaders.Origin, 'https://live.bilibili.com', 'B 站地址应带 Origin');
+    const plainHeaders = siteHeaders('https://example.com/media.mp4');
+    assert.strictEqual(plainHeaders.Referer, undefined, '普通地址不应带 Referer');
+
+    // 10. 代理：Range 透传 + HLS 播放列表重写
     upstreamServer = http.createServer((req, res) => {
       if (req.url === '/master.m3u8') {
         res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' });

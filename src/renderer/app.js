@@ -71,6 +71,7 @@ const state = {
   qualityValue: 'auto',
   pendingSeek: null,
   hls: null,
+  mpegts: null,
   scrubbing: false,
   lastTimeSentAt: 0,
   lastError: '',
@@ -263,6 +264,7 @@ async function handleCommand(command) {
 
 async function loadMedia(command) {
   cleanupHls();
+  cleanupMpegts();
   state.command = command;
   state.sources = Array.isArray(command.sources) ? command.sources : [];
   const sourceIndex = state.sources.findIndex((source) => source.url === command.url);
@@ -315,6 +317,13 @@ async function loadMedia(command) {
 
   applyVolumeToMedia();
 
+  // FLV 直播流（如 B 站直播）Chromium 原生不支持，需要用 mpegts.js 转封装
+  if (isFlvSource(command)) {
+    buildSourceQuality();
+    startMpegtsPlayback(command.url);
+    return;
+  }
+
   if (command.isHls && window.Hls && window.Hls.isSupported()) {
     const hls = new window.Hls({ enableWorker: true, backBufferLength: 90 });
     state.hls = hls;
@@ -341,6 +350,7 @@ async function loadMedia(command) {
 
 function stopPlayback() {
   cleanupHls();
+  cleanupMpegts();
   state.hasMedia = false;
   state.isPlaying = false;
   state.ignorePause = false;
@@ -718,6 +728,53 @@ function cleanupHls() {
   }
 }
 
+function cleanupMpegts() {
+  if (!state.mpegts) return;
+  const player = state.mpegts;
+  state.mpegts = null;
+  try {
+    player.pause();
+    player.unload();
+    player.detachMediaElement();
+    player.destroy();
+  } catch {
+    // 忽略
+  }
+}
+
+function isFlvSource(command) {
+  const mime = String(command.mime || '').toLowerCase();
+  if (mime.includes('flv')) return true;
+  return /\.flv(\?|#|$)/i.test(String(command.url || ''));
+}
+
+function startMpegtsPlayback(url) {
+  if (!window.mpegts || !window.mpegts.isSupported()) {
+    reportError('当前环境不支持 FLV 播放');
+    return;
+  }
+  const player = window.mpegts.createPlayer(
+    { type: 'flv', isLive: true, url },
+    {
+      enableWorker: false,
+      enableStashBuffer: false,
+      lazyLoad: false,
+      liveBufferLatencyChasing: true,
+    }
+  );
+  state.mpegts = player;
+  player.on(window.mpegts.Events.ERROR, (type, detail, info) => {
+    const reason = (info && info.msg) || detail || type || '未知错误';
+    reportError(`FLV 直播流播放失败：${reason}`);
+  });
+  player.attachMediaElement(ui.video);
+  player.load();
+  player.play().catch((error) => {
+    state.ignorePause = false;
+    reportError(`无法开始播放：${error.message || error}`);
+  });
+}
+
 function reportError(message) {
   if (!message || message === state.lastError) return;
   state.lastError = message;
@@ -736,6 +793,7 @@ function mediaLabel(command) {
   if (command.isImage) return '图片';
   const mime = String(command.mime || '').toLowerCase();
   if (command.isHls || mime.includes('mpegurl')) return 'HLS 流';
+  if (isFlvSource(command)) return 'FLV 直播流';
   if (mime.startsWith('audio/')) return '音频';
   if (mime.startsWith('video/')) {
     const ext = mime.slice('video/'.length);
